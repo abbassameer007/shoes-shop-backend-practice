@@ -33,7 +33,7 @@ exports.signup = async (req, res) => {
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
-    await emailService.sendSignupEmail(user.email);
+    // await emailService.sendSignupEmail(user.email);
 
     res.status(201).json({
       message: "User registered successfully",
