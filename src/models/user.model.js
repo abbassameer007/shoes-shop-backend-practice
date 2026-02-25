@@ -4,7 +4,19 @@ const userSchema = new mongoose.Schema(
   {
     name: String,
     email: { type: String, required: true, unique: true },
-    password: String,
+    password: String,cart: [
+  {
+    product: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
+    quantity: { type: Number, default: 1 }
+  }
+],
+
+favourites: [
+  {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Product"
+  }
+]
   },
   { timestamps: true }
 );
