@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const productController = require("../controllers/product.controller");
 const { protect } = require("../middlewares/auth.middleware");
+const upload = require("../middlewares/upload.middleware");
+
 
 /**
  * @swagger
@@ -9,7 +11,6 @@ const { protect } = require("../middlewares/auth.middleware");
  *   name: Products
  *   description: Product management APIs
  */
-
 /**
  * @swagger
  * /api/products:
@@ -21,7 +22,7 @@ const { protect } = require("../middlewares/auth.middleware");
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             required:
@@ -29,6 +30,7 @@ const { protect } = require("../middlewares/auth.middleware");
  *               - price
  *               - shoeBrand
  *               - sizes
+ *               - image
  *             properties:
  *               shoeName:
  *                 type: string
@@ -39,22 +41,23 @@ const { protect } = require("../middlewares/auth.middleware");
  *               price:
  *                 type: number
  *               sizes:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     country:
- *                       type: string
- *                       enum: [UK, US, EU]
- *                     values:
- *                       type: array
- *                       items:
- *                         type: number
+ *                 type: string
+ *                 description: JSON string of sizes array
+ *                 example: |
+ *                   [
+ *                     {
+ *                       "country": "UK",
+ *                       "values": [7,8,9]
+ *                     }
+ *                   ]
+ *               image:
+ *                 type: string
+ *                 format: binary
  *     responses:
  *       201:
  *         description: Product created successfully
  */
-router.post("/", protect, productController.createProduct);
+router.post("/", protect,upload.single("image"), productController.createProduct);
 
 /**
  * @swagger
@@ -113,7 +116,7 @@ router.get("/", productController.getProducts);
  *           type: string
  *     requestBody:
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
@@ -126,23 +129,45 @@ router.get("/", productController.getProducts);
  *               price:
  *                 type: number
  *               sizes:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     country:
- *                       type: string
- *                       enum: [UK, US, EU]
- *                     values:
- *                       type: array
- *                       items:
- *                         type: number
+ *                 type: string
+ *                 description: JSON string of sizes array
+ *                 example: |
+ *                   [
+ *                     {
+ *                       "country": "UK",
+ *                       "values": [7,8,9]
+ *                     }
+ *                   ]
+ *               image:
+ *                 type: string
+ *                 format: binary
  *     responses:
  *       200:
  *         description: Product updated successfully
  *       404:
  *         description: Product not found
  */
-router.put("/:id", protect, productController.updateProduct);
+router.put("/:id", protect, upload.single("image"),productController.updateProduct);
 
+/**
+ * @swagger
+ * /api/products/{id}:
+ *   delete:
+ *     summary: Delete a product
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Product deleted successfully
+ *       404:
+ *         description: Product not found
+ */
+router.delete("/:id", protect, productController.deleteProduct);
 module.exports = router;

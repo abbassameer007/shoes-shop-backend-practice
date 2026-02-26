@@ -1,45 +1,113 @@
 const Product = require("../models/product.model");
+const cloudinary = require("../config/cloudinary");
 
 exports.createProduct = async (req, res) => {
   try {
-    const { shoeName, price, sizes, shoeBrand } = req.body;
+    let { shoeName, price, sizes, shoeBrand, shoeColor } = req.body;
 
     if (!shoeName || !price || !shoeBrand) {
-      return res.status(400).json({ message: "shoeName , price and shoeBrand are required" });
+      return res.status(400).json({ message: "shoeName, price and shoeBrand are required" });
     }
 
-    if (!Array.isArray(sizes) || sizes.length === 0) {
-      return res.status(400).json({ message: "Sizes must be a non-empty array" });
-    }
-    
+    sizes = JSON.parse(sizes);
 
-    for (const size of sizes) {
-      if (!size.country || !["UK", "US", "EU"].includes(size.country)) {
-        return res.status(400).json({ message: "Invalid or missing country in sizes" });
+    if (!req.file) {
+      return res.status(400).json({ message: "Image is required" });
+    }
+
+    // 🔥 Upload to Cloudinary
+    const result = await cloudinary.uploader.upload_stream(
+      { folder: "products" },
+      async (error, result) => {
+        if (error) {
+          return res.status(500).json({ message: error.message });
+        }
+
+        const product = await Product.create({
+          shoeName,
+          price,
+          shoeBrand,
+          shoeColor,
+          sizes,
+          image: result.secure_url // save cloudinary URL
+        });
+
+        res.status(201).json({
+          message: "Product created successfully",
+          product
+        });
       }
+    );
 
-      if (!Array.isArray(size.values) || size.values.length === 0) {
-        return res.status(400).json({ message: "Values must be a non-empty array" });
-      }
-    }
-
-    const product = await Product.create(req.body);
-
-    res.status(201).json({
-      message: "Product created successfully",
-      product
-    });
+    result.end(req.file.buffer);
 
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
+//for storing image locally in our system/pc uploads directory
+// exports.createProduct = async (req, res) => {
+//   try {
+//     let { shoeName, price, sizes, shoeBrand, shoeColor } = req.body;
+
+//     if (!shoeName || !price || !shoeBrand) {
+//       return res.status(400).json({ message: "shoeName, price and shoeBrand are required" });
+//     }
+
+//     // 🔥 Parse sizes (because form-data sends string)
+//     sizes = JSON.parse(sizes);
+
+//     if (!Array.isArray(sizes) || sizes.length === 0) {
+//       return res.status(400).json({ message: "Sizes must be a non-empty array" });
+//     }
+
+//     for (const size of sizes) {
+//       if (!size.country || !["UK", "US", "EU"].includes(size.country)) {
+//         return res.status(400).json({ message: "Invalid or missing country in sizes" });
+//       }
+
+//       if (!Array.isArray(size.values) || size.values.length === 0) {
+//         return res.status(400).json({ message: "Values must be a non-empty array" });
+//       }
+//     }
+
+//     const productData = {
+//       shoeName,
+//       price,
+//       shoeBrand,
+//       shoeColor,
+//       sizes,
+//       image: req.file ? req.file.filename : null
+//     };
+
+//     const product = await Product.create(productData);
+
+//     res.status(201).json({
+//       message: "Product created successfully",
+//       product
+//     });
+
+//   } catch (error) {
+//     res.status(500).json({ message: error.message });
+//   }
+// };
+
+
 
 exports.updateProduct = async (req, res) => {
   try {
-    const { sizes } = req.body;
+    let { shoeName, price, sizes, shoeBrand, shoeColor } = req.body;
 
+    const product = await Product.findById(req.params.id);
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    // Parse sizes if provided
     if (sizes) {
+      sizes = JSON.parse(sizes);
+
       if (!Array.isArray(sizes) || sizes.length === 0) {
         return res.status(400).json({ message: "Sizes must be a non-empty array" });
       }
@@ -55,15 +123,35 @@ exports.updateProduct = async (req, res) => {
       }
     }
 
-    const product = await Product.findById(req.params.id);
+    let imageUrls = product.images;
 
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
+    // Single image upload
+    if (req.file) {
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "products" },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+
+        stream.end(req.file.buffer);
+      });
+
+      imageUrls = [result.secure_url];
     }
 
     const updatedProduct = await Product.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      {
+        shoeName: shoeName || product.shoeName,
+        price: price || product.price,
+        shoeBrand: shoeBrand || product.shoeBrand,
+        shoeColor: shoeColor || product.shoeColor,
+        sizes: sizes || product.sizes,
+        images: imageUrls
+      },
       { new: true, runValidators: true }
     );
 
@@ -125,3 +213,28 @@ exports.getProducts = async (req, res) => {
   }
 };
 
+exports.deleteProduct = async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+    // 🔥 Delete images from Cloudinary
+      if(product.image){
+
+        const publicId = product?.image?.split("/").pop().split(".")[0];
+        await cloudinary.uploader.destroy(`products/${publicId}`);
+      }
+    
+
+    await product.deleteOne();
+
+    res.status(200).json({
+      message: "Product deleted successfully"
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

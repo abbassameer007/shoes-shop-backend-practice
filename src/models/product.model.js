@@ -5,7 +5,7 @@ const productSchema = new mongoose.Schema(
     shoeName: { type: String, required: true },
     shoeBrand: { type: String },
     shoeColor: { type: String },
-
+    image: { type: String, required: true }, // product image URL
     price: { type: Number, required: true },
 
     sizes: [
