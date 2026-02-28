@@ -5,18 +5,57 @@ exports.createProduct = async (req, res) => {
   try {
     let { shoeName, price, sizes, shoeBrand, shoeColor } = req.body;
 
+    // Basic required fields
     if (!shoeName || !price || !shoeBrand) {
-      return res.status(400).json({ message: "shoeName, price and shoeBrand are required" });
+      return res.status(400).json({
+        message: "shoeName, price and shoeBrand are required"
+      });
     }
 
-    sizes = JSON.parse(sizes);
-
+    // Image validation
     if (!req.file) {
       return res.status(400).json({ message: "Image is required" });
     }
 
-    // 🔥 Upload to Cloudinary
-    const result = await cloudinary.uploader.upload_stream(
+    // Sizes validation
+    if (!sizes) {
+      return res.status(400).json({ message: "Sizes are required" });
+    }
+
+    try {
+      sizes = JSON.parse(sizes);
+    } catch (err) {
+      return res.status(400).json({ message: "Invalid sizes format" });
+    }
+
+    if (!Array.isArray(sizes) || sizes.length === 0) {
+      return res.status(400).json({
+        message: "Sizes must be a non-empty array"
+      });
+    }
+
+    for (const size of sizes) {
+      if (!size.country || !["UK", "US", "EU"].includes(size.country)) {
+        return res.status(400).json({
+          message: "Country must be UK, US, or EU"
+        });
+      }
+
+      if (!Array.isArray(size.values) || size.values.length === 0) {
+        return res.status(400).json({
+          message: "Size values must be a non-empty array"
+        });
+      }
+
+      if (!size.values.every(v => typeof v === "number")) {
+        return res.status(400).json({
+          message: "All size values must be numbers"
+        });
+      }
+    }
+
+    // Upload to Cloudinary
+    const uploadStream = cloudinary.uploader.upload_stream(
       { folder: "products" },
       async (error, result) => {
         if (error) {
@@ -29,20 +68,20 @@ exports.createProduct = async (req, res) => {
           shoeBrand,
           shoeColor,
           sizes,
-          image: result.secure_url // save cloudinary URL
+          image: result.secure_url
         });
 
-        res.status(201).json({
+        return res.status(201).json({
           message: "Product created successfully",
           product
         });
       }
     );
 
-    result.end(req.file.buffer);
+    uploadStream.end(req.file.buffer);
 
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 //for storing image locally in our system/pc uploads directory
@@ -99,33 +138,39 @@ exports.updateProduct = async (req, res) => {
     let { shoeName, price, sizes, shoeBrand, shoeColor } = req.body;
 
     const product = await Product.findById(req.params.id);
-
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    // Parse sizes if provided
-    if (sizes) {
-      sizes = JSON.parse(sizes);
+    // Validate sizes if provided
+    if (sizes !== undefined) {
+      try {
+        sizes = JSON.parse(sizes);
+      } catch (err) {
+        return res.status(400).json({ message: "Invalid sizes format" });
+      }
 
       if (!Array.isArray(sizes) || sizes.length === 0) {
-        return res.status(400).json({ message: "Sizes must be a non-empty array" });
+        return res.status(400).json({ message: "Sizes must be non-empty array" });
       }
 
       for (const size of sizes) {
         if (!size.country || !["UK", "US", "EU"].includes(size.country)) {
-          return res.status(400).json({ message: "Invalid or missing country in sizes" });
+          return res.status(400).json({ message: "Invalid country in sizes" });
         }
 
         if (!Array.isArray(size.values) || size.values.length === 0) {
-          return res.status(400).json({ message: "Values must be a non-empty array" });
+          return res.status(400).json({ message: "Values must be non-empty array" });
+        }
+
+        if (!size.values.every(v => typeof v === "number")) {
+          return res.status(400).json({ message: "Size values must be numbers" });
         }
       }
     }
 
-    let imageUrls = product.images;
+    let imageUrl = product.image;
 
-    // Single image upload
     if (req.file) {
       const result = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
@@ -135,22 +180,21 @@ exports.updateProduct = async (req, res) => {
             else resolve(result);
           }
         );
-
         stream.end(req.file.buffer);
       });
 
-      imageUrls = [result.secure_url];
+      imageUrl = result.secure_url;
     }
 
     const updatedProduct = await Product.findByIdAndUpdate(
       req.params.id,
       {
-        shoeName: shoeName || product.shoeName,
-        price: price || product.price,
-        shoeBrand: shoeBrand || product.shoeBrand,
-        shoeColor: shoeColor || product.shoeColor,
-        sizes: sizes || product.sizes,
-        images: imageUrls
+        shoeName: shoeName ?? product.shoeName,
+        price: price ?? product.price,
+        shoeBrand: shoeBrand ?? product.shoeBrand,
+        shoeColor: shoeColor ?? product.shoeColor,
+        sizes: sizes ?? product.sizes,
+        image: imageUrl
       },
       { new: true, runValidators: true }
     );
@@ -164,7 +208,6 @@ exports.updateProduct = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
 // /api/products?search=air&minPrice=100&page=1&limit=5
 exports.getProducts = async (req, res) => {
   try {
