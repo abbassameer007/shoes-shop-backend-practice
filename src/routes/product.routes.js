@@ -29,7 +29,6 @@ const upload = require("../middlewares/upload.middleware");
  *               - shoeName
  *               - price
  *               - shoeBrand
- *               - sizes
  *               - image
  *             properties:
  *               shoeName:
@@ -40,16 +39,6 @@ const upload = require("../middlewares/upload.middleware");
  *                 type: string
  *               price:
  *                 type: number
- *               sizes:
- *                 type: string
- *                 description: JSON string of sizes array
- *                 example: |
- *                   [
- *                     {
- *                       "country": "UK",
- *                       "values": [7,8,9]
- *                     }
- *                   ]
  *               image:
  *                 type: string
  *                 format: binary
@@ -128,16 +117,6 @@ router.get("/", productController.getProducts);
  *                 type: string
  *               price:
  *                 type: number
- *               sizes:
- *                 type: string
- *                 description: JSON string of sizes array
- *                 example: |
- *                   [
- *                     {
- *                       "country": "UK",
- *                       "values": [7,8,9]
- *                     }
- *                   ]
  *               image:
  *                 type: string
  *                 format: binary

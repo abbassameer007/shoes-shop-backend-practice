@@ -4,11 +4,17 @@ const cloudinary = require("../config/cloudinary");
 exports.createProduct = async (req, res) => {
   try {
     let { shoeName, price, sizes, shoeBrand, shoeColor } = req.body;
-
+sizes= [
+            { country: "UK", values: [7, 8, 9] },
+            { country: "US", values: [7, 8, 9] },
+            { country: "EU", values: [8, 9] },
+          ]; //currently sending sizes statically because app developer is not able to add these things
     // Basic required fields
+    // console.log(`see sameer`,sizes)
+
     if (!shoeName || !price || !shoeBrand) {
       return res.status(400).json({
-        message: "shoeName, price and shoeBrand are required"
+        message: "shoeName, price and shoeBrand are required",
       });
     }
 
@@ -22,34 +28,34 @@ exports.createProduct = async (req, res) => {
       return res.status(400).json({ message: "Sizes are required" });
     }
 
-    try {
-      sizes = JSON.parse(sizes);
-    } catch (err) {
-      return res.status(400).json({ message: "Invalid sizes format" });
-    }
+    // try {
+    //   sizes = JSON.parse(sizes);
+    // } catch (err) {
+    //   return res.status(400).json({ message: "Invalid sizes format" });
+    // }
 
     if (!Array.isArray(sizes) || sizes.length === 0) {
       return res.status(400).json({
-        message: "Sizes must be a non-empty array"
+        message: "Sizes must be a non-empty array",
       });
     }
 
     for (const size of sizes) {
       if (!size.country || !["UK", "US", "EU"].includes(size.country)) {
         return res.status(400).json({
-          message: "Country must be UK, US, or EU"
+          message: "Country must be UK, US, or EU",
         });
       }
 
       if (!Array.isArray(size.values) || size.values.length === 0) {
         return res.status(400).json({
-          message: "Size values must be a non-empty array"
+          message: "Size values must be a non-empty array",
         });
       }
 
-      if (!size.values.every(v => typeof v === "number")) {
+      if (!size.values.every((v) => typeof v === "number")) {
         return res.status(400).json({
-          message: "All size values must be numbers"
+          message: "All size values must be numbers",
         });
       }
     }
@@ -61,25 +67,23 @@ exports.createProduct = async (req, res) => {
         if (error) {
           return res.status(500).json({ message: error.message });
         }
-
         const product = await Product.create({
           shoeName,
           price,
           shoeBrand,
           shoeColor,
           sizes,
-          image: result.secure_url
+          image: result.secure_url,
         });
 
         return res.status(201).json({
           message: "Product created successfully",
-          product
+          product,
         });
-      }
+      },
     );
 
     uploadStream.end(req.file.buffer);
-
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -131,46 +135,25 @@ exports.createProduct = async (req, res) => {
 //   }
 // };
 
-
-
 exports.updateProduct = async (req, res) => {
   try {
-    let { shoeName, price, sizes, shoeBrand, shoeColor } = req.body;
+    let { shoeName, price, shoeBrand, shoeColor } = req.body;
 
     const product = await Product.findById(req.params.id);
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    // Validate sizes if provided
-    if (sizes !== undefined) {
-      try {
-        sizes = JSON.parse(sizes);
-      } catch (err) {
-        return res.status(400).json({ message: "Invalid sizes format" });
-      }
-
-      if (!Array.isArray(sizes) || sizes.length === 0) {
-        return res.status(400).json({ message: "Sizes must be non-empty array" });
-      }
-
-      for (const size of sizes) {
-        if (!size.country || !["UK", "US", "EU"].includes(size.country)) {
-          return res.status(400).json({ message: "Invalid country in sizes" });
-        }
-
-        if (!Array.isArray(size.values) || size.values.length === 0) {
-          return res.status(400).json({ message: "Values must be non-empty array" });
-        }
-
-        if (!size.values.every(v => typeof v === "number")) {
-          return res.status(400).json({ message: "Size values must be numbers" });
-        }
-      }
-    }
+    // ✅ Static sizes for testing
+    const sizes = [
+      { country: "UK", values: [7, 8, 9] },
+      { country: "US", values: [7, 8, 9] },
+      { country: "EU", values: [8, 9] },
+    ];
 
     let imageUrl = product.image;
 
+    // Image update (if new file provided)
     if (req.file) {
       const result = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
@@ -193,17 +176,16 @@ exports.updateProduct = async (req, res) => {
         price: price ?? product.price,
         shoeBrand: shoeBrand ?? product.shoeBrand,
         shoeColor: shoeColor ?? product.shoeColor,
-        sizes: sizes ?? product.sizes,
-        image: imageUrl
+        sizes, // ✅ static
+        image: imageUrl,
       },
       { new: true, runValidators: true }
     );
 
     res.status(200).json({
       message: "Product updated successfully",
-      product: updatedProduct
+      product: updatedProduct,
     });
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -211,7 +193,14 @@ exports.updateProduct = async (req, res) => {
 // /api/products?search=air&minPrice=100&page=1&limit=5
 exports.getProducts = async (req, res) => {
   try {
-    const { search, brand, minPrice, maxPrice, page = 1, limit = 10 } = req.query;
+    const {
+      search,
+      brand,
+      minPrice,
+      maxPrice,
+      page = 1,
+      limit = 10,
+    } = req.query;
 
     let query = {};
 
@@ -219,7 +208,7 @@ exports.getProducts = async (req, res) => {
     if (search) {
       query.$or = [
         { shoeName: { $regex: search, $options: "i" } },
-        { shoeBrand: { $regex: search, $options: "i" } }
+        { shoeBrand: { $regex: search, $options: "i" } },
       ];
     }
 
@@ -237,9 +226,7 @@ exports.getProducts = async (req, res) => {
 
     const skip = (page - 1) * limit;
 
-    const products = await Product.find(query)
-      .skip(skip)
-      .limit(Number(limit));
+    const products = await Product.find(query).skip(skip).limit(Number(limit));
 
     const total = await Product.countDocuments(query);
 
@@ -248,9 +235,8 @@ exports.getProducts = async (req, res) => {
       totalProducts: total,
       currentPage: Number(page),
       totalPages: Math.ceil(total / limit),
-      products
+      products,
     });
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -264,19 +250,16 @@ exports.deleteProduct = async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
     // 🔥 Delete images from Cloudinary
-      if(product.image){
-
-        const publicId = product?.image?.split("/").pop().split(".")[0];
-        await cloudinary.uploader.destroy(`products/${publicId}`);
-      }
-    
+    if (product.image) {
+      const publicId = product?.image?.split("/").pop().split(".")[0];
+      await cloudinary.uploader.destroy(`products/${publicId}`);
+    }
 
     await product.deleteOne();
 
     res.status(200).json({
-      message: "Product deleted successfully"
+      message: "Product deleted successfully",
     });
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
